@@ -134,6 +134,66 @@ class ProductViewSet(viewsets.ModelViewSet):
             # Fallback to rule-based optimization
             return self.rule_based_optimize_price(product, sales_data, traffic_data)
 
+    @action(detail=True, methods=['get'])
+    def predict_stock(self, request, pk=None):
+        """Predict stock requirements for the next N days"""
+        product = self.get_object()
+        
+        # Get prediction period from query params (default 30 days)
+        prediction_days = int(request.query_params.get('days', 30))
+        
+        # Get sales and traffic data
+        sales_data = list(Sale.objects.filter(product=product).values('quantity', 'timestamp'))
+        traffic_data = list(Traffic.objects.filter(product=product).values('visits', 'timestamp'))
+        
+        # Predict stock requirements
+        stock_prediction = ml_optimizer.predict_stock_requirements(
+            product, sales_data, traffic_data, prediction_days
+        )
+        
+        return Response({
+            'product_id': product.id,
+            'product_name': product.name,
+            'prediction': stock_prediction
+        })
+
+    @action(detail=False, methods=['get'])
+    def stock_dashboard(self, request):
+        """Get stock predictions for all products"""
+        products = Product.objects.all()
+        stock_predictions = []
+        
+        for product in products:
+            sales_data = list(Sale.objects.filter(product=product).values('quantity', 'timestamp'))
+            traffic_data = list(Traffic.objects.filter(product=product).values('visits', 'timestamp'))
+            
+            # Get 30-day prediction
+            prediction = ml_optimizer.predict_stock_requirements(product, sales_data, traffic_data, 30)
+            
+            stock_predictions.append({
+                'product_id': product.id,
+                'product_name': product.name,
+                'current_inventory': product.inventory,
+                'stockout_risk': prediction['stockout_risk'],
+                'days_until_stockout': prediction['days_until_stockout'],
+                'required_stock': prediction['required_stock'],
+                'stock_deficit': prediction['stock_deficit'],
+                'recommendation': prediction['recommendation']
+            })
+        
+        # Sort by stockout risk (highest first)
+        stock_predictions.sort(key=lambda x: x['stockout_risk'], reverse=True)
+        
+        return Response({
+            'stock_predictions': stock_predictions,
+            'summary': {
+                'total_products': len(products),
+                'high_risk_products': len([p for p in stock_predictions if p['stockout_risk'] > 0.7]),
+                'medium_risk_products': len([p for p in stock_predictions if 0.3 < p['stockout_risk'] <= 0.7]),
+                'low_risk_products': len([p for p in stock_predictions if p['stockout_risk'] <= 0.3])
+            }
+        })
+
     def rule_based_optimize_price(self, product, sales_data, traffic_data):
         """Original rule-based price optimization"""
         # Calculate sales velocity (sales per day in last 7 days)
