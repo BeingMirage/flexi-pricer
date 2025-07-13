@@ -17,37 +17,69 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def generate_mock_data(self, request):
-        """Generate mock products, sales, and traffic data"""
-        # Create mock products
+        """Generate mock products, sales, and traffic data with diverse scenarios"""
+        # Create mock products with different scenarios
         products_data = [
-            {'name': 'Laptop Pro', 'category': 'Electronics', 'price': 999.99, 'inventory': 50},
-            {'name': 'Smartphone X', 'category': 'Electronics', 'price': 699.99, 'inventory': 100},
-            {'name': 'Wireless Headphones', 'category': 'Electronics', 'price': 199.99, 'inventory': 75},
-            {'name': 'Gaming Console', 'category': 'Electronics', 'price': 499.99, 'inventory': 25},
-            {'name': 'Coffee Maker', 'category': 'Home', 'price': 89.99, 'inventory': 30},
-            {'name': 'Running Shoes', 'category': 'Sports', 'price': 129.99, 'inventory': 60},
-            {'name': 'Yoga Mat', 'category': 'Sports', 'price': 29.99, 'inventory': 120},
-            {'name': 'Bluetooth Speaker', 'category': 'Electronics', 'price': 79.99, 'inventory': 45},
+            # High demand, low inventory scenario
+            {'name': 'Laptop Pro', 'category': 'Electronics', 'price': 999.99, 'inventory': 15, 'scenario': 'high_demand_low_inventory'},
+            # High traffic, low conversion scenario
+            {'name': 'Smartphone X', 'category': 'Electronics', 'price': 699.99, 'inventory': 80, 'scenario': 'high_traffic_low_conversion'},
+            # Slow mover scenario
+            {'name': 'Yoga Mat', 'category': 'Sports', 'price': 29.99, 'inventory': 150, 'scenario': 'slow_mover'},
+            # Very high demand scenario
+            {'name': 'Gaming Console', 'category': 'Electronics', 'price': 499.99, 'inventory': 8, 'scenario': 'very_high_demand'},
+            # High conversion rate scenario
+            {'name': 'Wireless Headphones', 'category': 'Electronics', 'price': 199.99, 'inventory': 45, 'scenario': 'high_conversion'},
+            # Very low inventory scenario
+            {'name': 'Coffee Maker', 'category': 'Home', 'price': 89.99, 'inventory': 5, 'scenario': 'very_low_inventory'},
+            # Balanced scenario
+            {'name': 'Running Shoes', 'category': 'Sports', 'price': 129.99, 'inventory': 60, 'scenario': 'balanced'},
+            # Another slow mover
+            {'name': 'Bluetooth Speaker', 'category': 'Electronics', 'price': 79.99, 'inventory': 120, 'scenario': 'slow_mover'},
         ]
         
         products = []
         for data in products_data:
             product, created = Product.objects.get_or_create(
                 name=data['name'],
-                defaults=data
+                defaults={
+                    'name': data['name'],
+                    'category': data['category'],
+                    'price': data['price'],
+                    'inventory': data['inventory']
+                }
             )
             products.append(product)
         
-        # Generate mock sales and traffic for the last 30 days (more data for ML)
+        # Generate mock sales and traffic for the last 30 days with scenario-based patterns
         for product in products:
+            product_data = next(p for p in products_data if p['name'] == product.name)
+            scenario = product_data['scenario']
+            
             for i in range(30):
                 date = timezone.now() - timedelta(days=i)
                 
-                # Generate random sales with more realistic patterns
-                base_sales = random.randint(0, 8)
+                # Generate sales based on scenario
+                if scenario == 'high_demand_low_inventory':
+                    base_sales = random.randint(8, 15)  # High sales
+                elif scenario == 'high_traffic_low_conversion':
+                    base_sales = random.randint(1, 3)   # Low sales despite high traffic
+                elif scenario == 'slow_mover':
+                    base_sales = random.randint(0, 1)   # Very low sales
+                elif scenario == 'very_high_demand':
+                    base_sales = random.randint(12, 20) # Very high sales
+                elif scenario == 'high_conversion':
+                    base_sales = random.randint(6, 10)  # Good sales
+                elif scenario == 'very_low_inventory':
+                    base_sales = random.randint(5, 8)   # Moderate sales but low inventory
+                elif scenario == 'balanced':
+                    base_sales = random.randint(3, 6)   # Balanced sales
+                else:
+                    base_sales = random.randint(2, 5)   # Default
+                
                 # Add weekend effect
                 if date.weekday() >= 5:  # Weekend
-                    base_sales = int(base_sales * 1.5)
+                    base_sales = int(base_sales * 1.3)
                 
                 for _ in range(base_sales):
                     Sale.objects.create(
@@ -56,11 +88,27 @@ class ProductViewSet(viewsets.ModelViewSet):
                         timestamp=date
                     )
                 
-                # Generate random traffic with realistic patterns
-                base_traffic = random.randint(20, 150)
+                # Generate traffic based on scenario
+                if scenario == 'high_traffic_low_conversion':
+                    base_traffic = random.randint(100, 200)  # High traffic
+                elif scenario == 'high_demand_low_inventory':
+                    base_traffic = random.randint(80, 150)   # Good traffic
+                elif scenario == 'slow_mover':
+                    base_traffic = random.randint(20, 50)    # Low traffic
+                elif scenario == 'very_high_demand':
+                    base_traffic = random.randint(150, 250)  # Very high traffic
+                elif scenario == 'high_conversion':
+                    base_traffic = random.randint(60, 100)   # Moderate traffic
+                elif scenario == 'very_low_inventory':
+                    base_traffic = random.randint(70, 120)   # Good traffic
+                elif scenario == 'balanced':
+                    base_traffic = random.randint(50, 90)    # Balanced traffic
+                else:
+                    base_traffic = random.randint(40, 80)    # Default
+                
                 # Add weekend effect
                 if date.weekday() >= 5:  # Weekend
-                    base_traffic = int(base_traffic * 1.3)
+                    base_traffic = int(base_traffic * 1.2)
                 
                 Traffic.objects.create(
                     product=product,
@@ -68,34 +116,43 @@ class ProductViewSet(viewsets.ModelViewSet):
                     timestamp=date
                 )
         
-        return Response({'message': 'Mock data generated successfully'}, status=status.HTTP_201_CREATED)
+        return Response({
+            'message': 'Mock data generated successfully with diverse scenarios',
+            'scenarios_created': [p['scenario'] for p in products_data]
+        }, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['post'])
     def train_ml_models(self, request):
-        """Train ML models with existing data"""
+        """Train ML models with existing data or simple synthetic data"""
         try:
             # Get all data
             products = Product.objects.all()
             sales_data = list(Sale.objects.values('product', 'quantity', 'timestamp'))
             traffic_data = list(Traffic.objects.values('product', 'visits', 'timestamp'))
             
-            # Generate training data
+            # Try to generate training data from existing data first
             training_data = ml_optimizer.generate_training_data(products, sales_data, traffic_data)
             
-            # Train the model
-            if training_data:
+            if training_data and len(training_data) > 10:
+                # Train with real data if we have enough
                 ml_optimizer.train_demand_model(training_data)
                 ml_optimizer.models_trained = True
                 
                 return Response({
-                    'message': 'ML models trained successfully',
+                    'message': 'ML models trained successfully with real data',
                     'training_samples': len(training_data),
                     'models_trained': ['Random Forest Demand Predictor', 'Price Elasticity Model']
                 }, status=status.HTTP_200_OK)
             else:
+                # Fallback to simple synthetic training
+                ml_optimizer.train_simple_model()
+                
                 return Response({
-                    'message': 'Insufficient data for training. Generate more mock data first.'
-                }, status=status.HTTP_400_BAD_REQUEST)
+                    'message': 'ML models trained with synthetic data for immediate use',
+                    'training_samples': 'Synthetic data generated',
+                    'models_trained': ['Random Forest Demand Predictor (Synthetic)', 'Price Elasticity Model'],
+                    'note': 'Generate more mock data for better ML predictions'
+                }, status=status.HTTP_200_OK)
                 
         except Exception as e:
             return Response({
@@ -195,7 +252,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         })
 
     def rule_based_optimize_price(self, product, sales_data, traffic_data):
-        """Original rule-based price optimization"""
+        """Original rule-based price optimization with improved thresholds"""
         # Calculate sales velocity (sales per day in last 7 days)
         week_ago = timezone.now() - timedelta(days=7)
         recent_sales = [s for s in sales_data if s['timestamp'] >= week_ago]
@@ -207,20 +264,30 @@ class ProductViewSet(viewsets.ModelViewSet):
         sales_velocity = total_sales / 7
         conversion_rate = total_sales / total_visits if total_visits > 0 else 0
         
-        # Pricing logic based on flowchart
+        # Improved pricing logic with more sensitive thresholds
         current_price = float(product.price)
         new_price = current_price
         recommendation = "Keep price same"
         
-        if sales_velocity > 5 and product.inventory < 20:  # High demand + low inventory
-            new_price = current_price * 1.1  # Increase by 10%
+        # More sensitive thresholds for better recommendations
+        if sales_velocity > 3 and product.inventory < 30:  # Lowered threshold from 5 to 3, inventory from 20 to 30
+            new_price = current_price * 1.15  # Increased from 10% to 15%
             recommendation = "Increase price due to high demand and low inventory"
-        elif conversion_rate < 0.05 and total_visits > 50:  # High traffic + low conversion
-            new_price = current_price * 0.9  # Decrease by 10%
+        elif conversion_rate < 0.08 and total_visits > 30:  # Increased threshold from 0.05 to 0.08, visits from 50 to 30
+            new_price = current_price * 0.85  # Increased discount from 10% to 15%
             recommendation = "Lower price due to high traffic but low conversion"
-        elif sales_velocity < 1 and product.inventory > 50:  # Slow mover
-            new_price = current_price * 0.7  # Flash sale - 30% off
+        elif sales_velocity < 2 and product.inventory > 40:  # Increased threshold from 1 to 2, inventory from 50 to 40
+            new_price = current_price * 0.65  # Increased discount from 30% to 35%
             recommendation = "Trigger flash sale for slow moving product"
+        elif sales_velocity > 5:  # High demand regardless of inventory
+            new_price = current_price * 1.1
+            recommendation = "Increase price due to very high demand"
+        elif conversion_rate > 0.15:  # High conversion rate
+            new_price = current_price * 1.05
+            recommendation = "Slight price increase due to high conversion rate"
+        elif product.inventory < 10:  # Very low inventory
+            new_price = current_price * 1.2
+            recommendation = "Significant price increase due to very low inventory"
         
         # Update product price
         product.price = new_price
@@ -236,7 +303,7 @@ class ProductViewSet(viewsets.ModelViewSet):
             'conversion_rate': conversion_rate,
             'total_visits': total_visits,
             'inventory': product.inventory,
-            'optimization_method': 'Rule-based'
+            'optimization_method': 'Rule-based (Improved)'
         })
 
     @action(detail=True, methods=['get'])

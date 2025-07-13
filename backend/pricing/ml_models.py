@@ -280,6 +280,54 @@ class PricingMLOptimizer:
         self.demand_model.fit(X_scaled, y)
         
         return True
+
+    def train_simple_model(self):
+        """Train a simple ML model with basic synthetic data for immediate use"""
+        # Create simple synthetic training data
+        X = []
+        y = []
+        
+        # Generate synthetic scenarios
+        for price in [50, 100, 200, 500, 1000]:
+            for inventory in [10, 25, 50, 100, 200]:
+                for sales_velocity in [1, 3, 5, 8, 12]:
+                    for conversion_rate in [0.02, 0.05, 0.08, 0.12, 0.15]:
+                        # Create feature vector
+                        features = {
+                            'price': price,
+                            'inventory': inventory,
+                            'sales_velocity_7d': sales_velocity,
+                            'conversion_rate_7d': conversion_rate,
+                            'traffic_avg_7d': sales_velocity / max(conversion_rate, 0.01),
+                            'day_of_week': 3,  # Wednesday
+                            'month': 7,  # July
+                            'is_weekend': 0,
+                            'price_elasticity': -0.8,
+                            'competitor_price_ratio': 1.0,
+                            'market_demand_index': 1.0
+                        }
+                        
+                        # Simulate demand based on price elasticity
+                        base_demand = sales_velocity
+                        price_elasticity = -0.8
+                        optimal_price = 200  # Assume optimal price is $200
+                        price_ratio = price / optimal_price
+                        simulated_demand = base_demand * (price_ratio ** price_elasticity)
+                        
+                        X.append(list(features.values()))
+                        y.append(max(0, simulated_demand))
+        
+        X = np.array(X)
+        y = np.array(y)
+        
+        # Scale features
+        X_scaled = self.scaler.fit_transform(X)
+        
+        # Train model
+        self.demand_model.fit(X_scaled, y)
+        self.models_trained = True
+        
+        return True
     
     def predict_demand(self, features):
         """Predict demand for given features"""
